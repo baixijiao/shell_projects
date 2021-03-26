@@ -1,0 +1,6 @@
+使用指南
+1.从数据库中复制字段名称、字段类型、字段长度到temp文件夹下《resource.txt》中。
+2.打开Git Bash命令窗口，执行replace.sh命令
+3.脚本执行后会把执行结果保存到target文件夹下《result.txt》中。
+4.查看《result.txt》中“数据类型之后需要删除”提示，并按要求操作。
+5.删除《result.txt》中最后一个逗号“，”。
