@@ -34,31 +34,97 @@ error() {
 # 读取文件
 operate() {
   local file=$1
-  # Oracle中需要转换成Doris中Varchar的类型
-  local oracleToVarchar="VARCHAR、VARCHAR2、NCLOB、CLOB"
-  # Oracle中需要转换成Doris中INT的类型
-  local oracleToINT="NUMBER、INTEGER、INT"
-  # Oracle中需要转换成Doris中CHAR的类型
-  local oracleToCHAR="CHAR、NCHAR"
-  # Oracle中需要转换成Doris中CHAR的类型
-  local oracleToDATE="DATE"
+
   for line in `cat $file`
   do
 #    echo $line
-    # 是字符串“VARCHAR、VARCHAR2、NCLOB、CLOB”替换为VARCHAR
-    if [[ $oracleToVarchar =~ $line ]]; then
-      echo "VARCHAR(" >> $TARGET_DIR
-    elif [[ $oracleToINT =~ $line ]]; then
-      echo "INT(" >> $TARGET_DIR
-    elif [[ $oracleToCHAR =~ $line ]]; then
-      echo "CHAR(" >> $TARGET_DIR
-    elif [[ $oracleToDATE =~ $line ]]; then
-      echo "DATE-数据类型之后需要删除(" >> $TARGET_DIR
-    else
+    oracleToDorisType "$line"
+    local retCode=$?
+    if [ $retCode -eq 0 ]; then
       echo $line >> $TARGET_DIR
+    elif [ $retCode -eq 1 ]; then
+      echo "VARCHAR(" >> $TARGET_DIR
+    elif [ $retCode -eq 2 ]; then
+      echo "INT(" >> $TARGET_DIR
+    elif [ $retCode -eq 3 ]; then
+      echo "CHAR(" >> $TARGET_DIR
+    elif [ $retCode -eq 4 ]; then
+      echo "DATE-数据类型之后需要删除(" >> $TARGET_DIR
     fi
 
   done
+}
+
+# Oracle中需要转换成Doris
+oracleToDorisType(){
+  local retStr=0
+
+  local line=$1
+   # Oracle中需要转换成Doris中Varchar的类型
+  local oracleToVarchar=(VARCHAR VARCHAR2 NCLOB CLOB)
+  local isReplace=0
+  for(( i=0;i<${#oracleToVarchar[@]};i++))
+  do
+    #${#array[@]}获取数组长度用于循环
+    local dataType=${oracleToVarchar[i]}
+    if [[ "$line" = "$dataType" ]]; then
+      isReplace=1
+    fi
+  done
+  if [ $isReplace -eq 1 ]; then
+    retStr=1
+    return $retStr
+  fi
+
+  # Oracle中需要转换成Doris中INT的类型
+  local oracleToINT=(NUMBER INTEGER INT)
+  isReplace=0
+  for(( i=0;i<${#oracleToINT[@]};i++))
+  do
+    #${#array[@]}获取数组长度用于循环
+    local dataType=${oracleToINT[i]}
+    if [[ "$line" = "$dataType" ]]; then
+      isReplace=1
+    fi
+  done
+  if [ $isReplace -eq 1 ]; then
+    retStr=2
+    return $retStr
+  fi
+
+  # Oracle中需要转换成Doris中CHAR的类型
+  local oracleToCHAR=(CHAR NCHAR)
+  isReplace=0
+  for(( i=0;i<${#oracleToCHAR[@]};i++))
+  do
+    #${#array[@]}获取数组长度用于循环
+    local dataType=${oracleToCHAR[i]}
+    if [[ "$line" = "$dataType" ]]; then
+      isReplace=1
+    fi
+  done
+  if [ $isReplace -eq 1 ]; then
+    retStr=3
+    return $retStr
+  fi
+
+  # Oracle中需要转换成Doris中CHAR的类型
+  local oracleToDATE=(DATE)
+  isReplace=0
+  for(( i=0;i<${#oracleToDATE[@]};i++))
+  do
+    #${#array[@]}获取数组长度用于循环
+    local dataType=${oracleToDATE[i]}
+    if [[ "$line" = "$dataType" ]]; then
+      isReplace=1
+    fi
+  done
+  if [ $isReplace -eq 1 ]; then
+    retStr=4
+    return $retStr
+  else
+    return $retStr
+  fi
 }
 
 # 3行合为一行
@@ -76,123 +142,28 @@ addLineEnd(){
   cp $TEMP_DIR $file
 }
 
-# 替换所有空格
+# 替换每行第二个空格
 replaceAllBlank(){
   true > $TEMP_DIR
   local file=$1
-  echo "********开始替换所有空格********"
-  sed s/[[:space:]]//g $file >> $TEMP_DIR
+#  echo "********开始替换每行第二个空格********"
+  sed "s/ //2" $file >> $TEMP_DIR
   true > $file
   cp $TEMP_DIR $file
-  echo "********完成替换所有空格********"
+#  echo "********完成替换每行第二个空格********"
 }
 
-# Doris数据类型前添加空格
-addDataTypeBlank(){
+# 生成查询语句
+generalSelect(){
+  echo "********开始生成查询语句********"
+  true > $TEMP_DIR
   local file=$1
-  # Doris中数据类型
-  # 由于该算法根据字符串匹配，Doris中数据类型有字符串包含的关系；暂不支持CHAR、DATETIME、LARGEINT、SMALLINT、TINYINT类型
-  local dorisDataTypeArr=(BIGINT BITMAP BOOLEAN CHAR DATE DATETIME DECIMAL DOUBLE FLOAT HLL INT LARGEINT SMALLINT TINYINT VARCHAR)
-  echo "********开始数据类型前添加空格********"
-  for(( i=0;i<${#dorisDataTypeArr[@]};i++))
-  do
-    #${#array[@]}获取数组长度用于循环
-    local dataType=${dorisDataTypeArr[i]}
-
-    if [[ "BIGINT" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/BIGINT/ BIGINT/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-    elif [[ "BITMAP" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/BITMAP/ BITMAP/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-    elif [[ "BOOLEAN" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/BOOLEAN/ BOOLEAN/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-#    elif [[ "CHAR" == "$dataType" ]]; then
-#      true > $TEMP_DIR
-#      sed "s/CHAR/ CHAR/g" $file >> $TEMP_DIR
-#      true > $file
-#      cp $TEMP_DIR $file
-    elif [[ "DATE" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/DATE/ DATE/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-#    elif [[ "DATETIME" == "$dataType" ]]; then
-#      true > $TEMP_DIR
-#      sed "s/DATETIME/ DATETIME/g" $file >> $TEMP_DIR
-#      true > $file
-#      cp $TEMP_DIR $file
-    elif [[ "DECIMAL" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/DECIMAL/ DECIMAL/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-    elif [[ "DOUBLE" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/DOUBLE/ DOUBLE/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-    elif [[ "FLOAT" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/FLOAT/ FLOAT/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-    elif [[ "HLL" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/HLL/ HLL/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-    elif [[ "INT" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/INT/ INT/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-
-      # 由于Oracle数据中NUMBER类型默认长度为0，此处需要特殊处理
-      true > $TEMP_DIR
-      sed "s/(0)/(11)/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-
-#    elif [[ "LARGEINT" == "$dataType" ]]; then
-#      true > $TEMP_DIR
-#      sed "s/LARGEINT/ LARGEINT/g" $file >> $TEMP_DIR
-#      true > $file
-#      cp $TEMP_DIR $file
-#    elif [[ "SMALLINT" == "$dataType" ]]; then
-#      true > $TEMP_DIR
-#      sed "s/SMALLINT/ SMALLINT/g" $file >> $TEMP_DIR
-#      true > $file
-#      cp $TEMP_DIR $file
-#    elif [[ "TINYINT" == "$dataType" ]]; then
-#      true > $TEMP_DIR
-#      sed "s/TINYINT/ TINYINT/g" $file >> $TEMP_DIR
-#      true > $file
-#      cp $TEMP_DIR $file
-    elif [[ "VARCHAR" == "$dataType" ]]; then
-      true > $TEMP_DIR
-      sed "s/VARCHAR/ VARCHAR/g" $file >> $TEMP_DIR
-      true > $file
-      cp $TEMP_DIR $file
-    else
-      echo ${dorisDataTypeArr[i]}
-      echo "Doris中数据类型无此数据类型或者算法暂不支持的类型${dorisDataTypeArr[i]}"
-    fi
-
-
-
-  done
-
-  echo "********完成数据类型前添加空格********"
+  cat $RESULT_CREATE_DIR | awk -F " " '{print $1}' > $RESULT_SELECT_DIR
+  sed "s/$/&,/g" $file >> $TEMP_DIR
+  true > $file
+  cp $TEMP_DIR $file
+  echo "********完成生成查询语句********"
 }
-
 
 # 遍历并处理文件
 ls temp/*|while read listfile
@@ -202,10 +173,12 @@ do
   # 3行合为一行
   compose "$TARGET_DIR"
   addLineEnd "$RESULT_CREATE_DIR"
-  # 替换所有空格
+  # 替换每行第二个空格，生成建表语句字段
   replaceAllBlank "$RESULT_CREATE_DIR"
-  # Doris数据类型前添加空格
-  addDataTypeBlank "$RESULT_CREATE_DIR"
+
+  # 生成查询语句
+  generalSelect "$RESULT_SELECT_DIR"
+
 
 
 
