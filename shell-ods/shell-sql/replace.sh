@@ -165,14 +165,71 @@ generalSelect(){
   echo "********完成生成查询语句********"
 }
 
+# 最后一行逗号处理
+handlelastLine(){
+  true > $TEMP_TEMP_FILE
+  local file=$1
+  # 读取最后一行并替换
+  cat $file | awk 'END {print}' | sed 's/,//' >> $TEMP_TEMP_FILE
+  #删除最后一行
+  sed -i '$d' $file
+  # 在最后一行后添加
+  cat $TEMP_TEMP_FILE >> $file
+}
+
+# 拼接SQL
+connectSQL(){
+  local file=$1
+  local startStr=$2
+  local endStr=$3
+  sed -i "1i $startStr" $file
+  echo -e $endStr >> $file
+
+  # 去掉空行
+  sed -i '/^$/d' $file
+}
+
 
 # 删除临时文件
 delTempFile(){
   rm -rf $TEMP_DIR
 }
 
+# 删除临时文件
+delTempFile
 # 创建文件夹
 mkdir $TEMP_DIR
+# 参数处理-开始
+tableName=""
+tableComment=""
+keyType=""
+keys=""
+hashParm=""
+creatStartStr="CREATE TABLE "
+creatEndStr=""
+selectStartStr="SELECT"
+selectEndStr=""
+if [ "$#" -eq 5 ]; then
+  tableName=$1
+  creatStartStr="$creatStartStr$tableName ("
+  if [ "$2" -eq 1 ]; then
+    keyType="UNIQUE"
+  elif [ "$2" -eq 2 ]; then
+    keyType="DUPLICATE"
+  else
+    echo "主键类型参数异常，请重新配置 1代表UNIQUE 2代表DUPLICATE"
+    exit 1
+  fi
+  keys=$3
+  hashParm=$4
+  tableComment=$5
+  creatEndStr="\n)\n$keyType KEY($keys)\nCOMMENT \"$tableComment\"\nDISTRIBUTED BY HASH($hashParm) BUCKETS 10\nPROPERTIES(\"replication_num\" = \"3\");"
+  selectEndStr="$selectEndStr\nFROM $tableName"
+else
+  echo "参数不是5个，格式为：表名称 主键类型 主键 HASH字段 表注释"
+  exit 1
+fi
+# 参数处理-结束
 # 遍历并处理文件
 ls resource/*|while read listfile
 do
@@ -186,6 +243,13 @@ do
 
   # 生成查询语句
   generalSelect "$RESULT_SELECT_FILE"
+  # 最后一行逗号处理
+  handlelastLine "$RESULT_CREATE_FILE"
+  handlelastLine "$RESULT_SELECT_FILE"
+
+  # 拼接SQL
+  connectSQL "$RESULT_CREATE_FILE" "$creatStartStr" "$creatEndStr"
+  connectSQL "$RESULT_SELECT_FILE" "$selectStartStr" "$selectEndStr"
 
 
   # 删除临时文件
