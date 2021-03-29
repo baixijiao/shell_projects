@@ -1,22 +1,22 @@
 #!/bin/bash
 # 资源文件路径
-RESOURCE_DIR=temp/resource.txt
+RESOURCE_FILE=resource/resource.txt
+# 临时文件夹
+TEMP_DIR=temp
 # 目标文件路径
-TARGET_DIR=./target/bb.txt
+TEMP_COPYRESOURCE_FILE=./temp/copyResource.txt
 # 临时数据表
-TEMP_DIR=./target/temp.txt
+TEMP_TEMP_FILE=./temp/temp.txt
 # 最终结果-建表语句
-RESULT_CREATE_DIR=./target/result_create.txt
+RESULT_CREATE_FILE=./target/result_create.txt
 # 最终结果-查询语句
-RESULT_SELECT_DIR=./target/result_select.txt
+RESULT_SELECT_FILE=./target/result_select.txt
 
 
 # 清空文件历史数据
 echo "开始清空历史数据。。。"
-true > $TARGET_DIR
-true > $TEMP_DIR
-true > $RESULT_CREATE_DIR
-true > $RESULT_SELECT_DIR
+true > $RESULT_CREATE_FILE
+true > $RESULT_SELECT_FILE
 echo "完成清空历史数据。。。"
 
 # 设置标准输入输出
@@ -41,15 +41,15 @@ operate() {
     oracleToDorisType "$line"
     local retCode=$?
     if [ $retCode -eq 0 ]; then
-      echo $line >> $TARGET_DIR
+      echo $line >> $TEMP_COPYRESOURCE_FILE
     elif [ $retCode -eq 1 ]; then
-      echo "VARCHAR(" >> $TARGET_DIR
+      echo "VARCHAR(" >> $TEMP_COPYRESOURCE_FILE
     elif [ $retCode -eq 2 ]; then
-      echo "INT(" >> $TARGET_DIR
+      echo "INT(" >> $TEMP_COPYRESOURCE_FILE
     elif [ $retCode -eq 3 ]; then
-      echo "CHAR(" >> $TARGET_DIR
+      echo "CHAR(" >> $TEMP_COPYRESOURCE_FILE
     elif [ $retCode -eq 4 ]; then
-      echo "DATE-数据类型之后需要删除(" >> $TARGET_DIR
+      echo "DATE-数据类型之后需要删除(" >> $TEMP_COPYRESOURCE_FILE
     fi
 
   done
@@ -130,57 +130,66 @@ oracleToDorisType(){
 # 3行合为一行
 compose(){
   local file=$1
-  sed 'N;N;s/\n/ /g' $file >> $RESULT_CREATE_DIR
+  sed 'N;N;s/\n/ /g' $file >> $RESULT_CREATE_FILE
 }
 
 # 文件行尾处理
 addLineEnd(){
   local file=$1
   echo "****************"
-  sed "s/$/&),/g" $file >> $TEMP_DIR
+  sed "s/$/&),/g" $file >> $TEMP_TEMP_FILE
   true > $file
-  cp $TEMP_DIR $file
+  cp $TEMP_TEMP_FILE $file
 }
 
 # 替换每行第二个空格
 replaceAllBlank(){
-  true > $TEMP_DIR
+  true > $TEMP_TEMP_FILE
   local file=$1
 #  echo "********开始替换每行第二个空格********"
-  sed "s/ //2" $file >> $TEMP_DIR
+  sed "s/ //2" $file >> $TEMP_TEMP_FILE
   true > $file
-  cp $TEMP_DIR $file
+  cp $TEMP_TEMP_FILE $file
 #  echo "********完成替换每行第二个空格********"
 }
 
 # 生成查询语句
 generalSelect(){
   echo "********开始生成查询语句********"
-  true > $TEMP_DIR
+  true > $TEMP_TEMP_FILE
   local file=$1
-  cat $RESULT_CREATE_DIR | awk -F " " '{print $1}' > $RESULT_SELECT_DIR
-  sed "s/$/&,/g" $file >> $TEMP_DIR
+  cat $RESULT_CREATE_FILE | awk -F " " '{print $1}' > $RESULT_SELECT_FILE
+  sed "s/$/&,/g" $file >> $TEMP_TEMP_FILE
   true > $file
-  cp $TEMP_DIR $file
+  cp $TEMP_TEMP_FILE $file
   echo "********完成生成查询语句********"
 }
 
+
+# 删除临时文件
+delTempFile(){
+  rm -rf $TEMP_DIR
+}
+
+# 创建文件夹
+mkdir $TEMP_DIR
 # 遍历并处理文件
-ls temp/*|while read listfile
+ls resource/*|while read listfile
 do
   # 读取文件
   operate "$listfile"
   # 3行合为一行
-  compose "$TARGET_DIR"
-  addLineEnd "$RESULT_CREATE_DIR"
+  compose "$TEMP_COPYRESOURCE_FILE"
+  addLineEnd "$RESULT_CREATE_FILE"
   # 替换每行第二个空格，生成建表语句字段
-  replaceAllBlank "$RESULT_CREATE_DIR"
+  replaceAllBlank "$RESULT_CREATE_FILE"
 
   # 生成查询语句
-  generalSelect "$RESULT_SELECT_DIR"
+  generalSelect "$RESULT_SELECT_FILE"
 
 
-
+  # 删除临时文件
+  delTempFile
 
 done
 
