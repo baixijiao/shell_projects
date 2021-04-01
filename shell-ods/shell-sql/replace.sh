@@ -14,10 +14,10 @@ RESULT_SELECT_FILE=./target/result_select.txt
 
 
 # 清空文件历史数据
-echo "开始清空历史数据。。。"
+#echo "开始清空历史数据。。。"
 true > $RESULT_CREATE_FILE
 true > $RESULT_SELECT_FILE
-echo "完成清空历史数据。。。"
+#echo "完成清空历史数据。。。"
 
 # 设置标准输入输出
 note() {
@@ -211,7 +211,6 @@ selectStartStr="SELECT"
 selectEndStr=""
 if [ "$#" -eq 5 ]; then
   tableName=$1
-  creatStartStr="$creatStartStr$tableName ("
   if [ "$2" -eq 1 ]; then
     keyType="UNIQUE"
   elif [ "$2" -eq 2 ]; then
@@ -223,8 +222,30 @@ if [ "$#" -eq 5 ]; then
   keys=$3
   hashParm=$4
   tableComment=$5
+  creatStartStr="$creatStartStr$tableName ("
   creatEndStr="\n)\n$keyType KEY($keys)\nCOMMENT \"$tableComment\"\nDISTRIBUTED BY HASH($hashParm) BUCKETS 10\nPROPERTIES(\"replication_num\" = \"3\");"
   selectEndStr="$selectEndStr\nFROM $tableName"
+elif [ "$#" -eq 0 ]; then
+  echo "********请按提示输入参数********"
+  echo "********请按提示输入参数********"
+  read -p '请输入表名称：' tableName
+  read -p '请输入主键类型(1代表UNIQUE 2代表DUPLICATE)：' keyTypeInt
+  if [ "$keyTypeInt" -eq 1 ]; then
+    keyType="UNIQUE"
+  elif [ "$keyTypeInt" -eq 2 ]; then
+    keyType="DUPLICATE"
+  else
+    echo "主键类型参数异常，请重新配置 1代表UNIQUE 2代表DUPLICATE"
+    exit 1
+  fi
+  read -p '请输入主键(复合主键请用英文逗号分隔)：' keys
+  read -p '请输入需要HASH字段：' hashParm
+  read -p '请输入表注释：' tableComment
+  creatStartStr="$creatStartStr$tableName ("
+  creatEndStr="\n)\n$keyType KEY($keys)\nCOMMENT \"$tableComment\"\nDISTRIBUTED BY HASH($hashParm) BUCKETS 10\nPROPERTIES(\"replication_num\" = \"3\");"
+  selectEndStr="$selectEndStr\nFROM $tableName"
+  echo "********请等待。。。正在生成。。。********"
+  echo "********请等待。。。正在生成。。。********"
 else
   echo "参数不是5个，格式为：表名称 主键类型 主键 HASH字段 表注释"
   exit 1

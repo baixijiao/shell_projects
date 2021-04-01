@@ -1,0 +1,7 @@
+使用指南
+1.从数据库中复制字段名称、字段类型、字段长度到resource文件夹下《resource.txt》中。
+2.打开Git Bash命令窗口，执行replace.sh命令
+2.1.执行replace.sh命令不带参数，根据提示按要求依次输入相关信息
+2.2.执行replace.sh命令带参数，共5个参数，格式为：表名称 主键类型 主键 HASH字段 表注释
+3.脚本执行后会把执行结果保存到target文件夹下建表语句《result_create.txt》、查询语句《result_select.txt》中。
+4.查看《result_create.txt》中“数据类型之后需要删除”提示，并按要求操作。
